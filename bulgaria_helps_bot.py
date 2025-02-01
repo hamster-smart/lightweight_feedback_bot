@@ -23,7 +23,7 @@ def webhook():
     """Получение обновлений от Telegram через Webhook."""
     json_update = request.get_json()
     update = Update.de_json(json_update, application.bot)
-    application.process_update(update)  # Обрабатываем обновление
+    application.dispatcher.process_update(update)  # Используем правильный метод для обработки обновлений
     return "OK"
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
