@@ -1,1 +1,1 @@
-worker: python bulgaria_helps_bot.py
+# worker: python bulgaria_helps_bot.py
