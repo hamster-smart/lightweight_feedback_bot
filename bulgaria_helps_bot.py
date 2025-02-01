@@ -45,7 +45,7 @@ async def handle_admin_response(update: Update, context: ContextTypes.DEFAULT_TY
 
 def main():
     # Вставьте свой токен бота
-    TOKEN = "7878432935:AAGgCShIs7jl9AYLe1KR1Nik5_2FKU93lP4"
+    TOKEN = "7878432935:AAFG6WuAlnQI28WZubHFUIj5coHZPNWYDRQ"
     application = ApplicationBuilder().token(TOKEN).build()
 
     # Регистрируем обработчики
