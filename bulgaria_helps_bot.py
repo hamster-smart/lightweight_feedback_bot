@@ -2,7 +2,7 @@ from flask import Flask, request
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 import os
-print("BOT_TOKEN:", os.getenv("BOT_TOKEN"))
+BOT_TOKEN = "7878432935:AAHVwLQ8E79f2f5fN4M_s3CdK-6Eh5Attrc"
 
 # Flask приложение для фиктивного порта и Webhook
 app = Flask(__name__)
