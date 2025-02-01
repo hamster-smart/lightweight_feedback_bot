@@ -7,7 +7,7 @@ import os
 app = Flask(__name__)
 
 # Переменные окружения
-BOT_TOKEN = os.getenv("7878432935:AAHVwLQ8E79f2f5fN4M_s3CdK-6Eh5Attrc")
+BOT_TOKEN = os.getenv("BOT_TOKEN")  # Используйте переменную окружения для токена
 WEBHOOK_URL = f"https://telegram-feedback-bot-pw8r.onrender.com/webhook"  # Замените на URL вашего сервиса
 ADMIN_ID = 5240690995  # Вставьте свой Telegram ID
 
@@ -23,7 +23,7 @@ def webhook():
     """Получение обновлений от Telegram через Webhook."""
     json_update = request.get_json()
     update = Update.de_json(json_update, application.bot)
-    application.update_queue.put_nowait(update)
+    application.process_update(update)  # Обрабатываем обновление
     return "OK"
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
