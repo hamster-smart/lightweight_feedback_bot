@@ -1,17 +1,30 @@
+from flask import Flask, request
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
-from flask import Flask
 import os
 
-# Создаем Flask приложение для фиктивного ожидания порта
+# Flask приложение для фиктивного порта и Webhook
 app = Flask(__name__)
+
+# Переменные окружения
+BOT_TOKEN = os.getenv("7878432935:AAHVwLQ8E79f2f5fN4M_s3CdK-6Eh5Attrc")
+WEBHOOK_URL = f"https://telegram-feedback-bot-pw8r.onrender.com/webhook"  # Замените на URL вашего сервиса
+ADMIN_ID = 5240690995  # Вставьте свой Telegram ID
+
+# Создаем экземпляр приложения Telegram
+application = ApplicationBuilder().token(BOT_TOKEN).build()
 
 @app.route('/')
 def index():
-    return "Bot is running!"
+    return "Bot is running through Webhook!"
 
-# ID администратора (замените на ваш)
-ADMIN_ID = 5240690995  # Вставьте свой Telegram ID
+@app.route('/webhook', methods=['POST'])
+def webhook():
+    """Получение обновлений от Telegram через Webhook."""
+    json_update = request.get_json()
+    update = Update.de_json(json_update, application.bot)
+    application.update_queue.put_nowait(update)
+    return "OK"
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обрабатывает команду /start."""
@@ -44,10 +57,6 @@ async def handle_admin_response(update: Update, context: ContextTypes.DEFAULT_TY
         await update.message.reply_text("Ответьте на сообщение пользователя, чтобы отправить ответ.")
 
 def main():
-    # Вставьте свой токен бота
-    TOKEN = "7878432935:AAFG6WuAlnQI28WZubHFUIj5coHZPNWYDRQ"
-    application = ApplicationBuilder().token(TOKEN).build()
-
     # Регистрируем обработчики
     application.add_handler(CommandHandler("start", start))
     application.add_handler(MessageHandler(filters.TEXT & (~filters.FORWARDED) & (~filters.UpdateType.EDITED), forward_to_admin))
@@ -56,10 +65,10 @@ def main():
     if ADMIN_ID:
         application.add_handler(MessageHandler(filters.TEXT & filters.Chat(ADMIN_ID), handle_admin_response))
 
-    # Запускаем бота
-    application.run_polling()
+    # Устанавливаем Webhook для бота
+    application.bot.set_webhook(WEBHOOK_URL)
 
-    # Запуск Flask для фиктивного ожидания порта
+    # Запуск Flask сервера
     app.run(host='0.0.0.0', port=int(os.getenv("PORT", 8080)))
 
 if __name__ == '__main__':
