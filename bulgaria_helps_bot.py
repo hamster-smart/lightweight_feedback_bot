@@ -1,6 +1,8 @@
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 import os
+import http.server
+import socketserver
 
 # Переменные окружения
 BOT_TOKEN = os.getenv("BOT_TOKEN")  # Используем переменную окружения для токена
@@ -28,16 +30,31 @@ async def forward_to_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_admin_response(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обрабатывает ответы администратора и пересылает их пользователю."""
     if update.message.reply_to_message:
-        # Получаем ID пользователя из текста ответа
-        text = update.message.reply_to_message.text
-        user_id_start = text.find("ID: ") + 4
-        user_id_end = text.find(")", user_id_start)
-        user_id = int(text[user_id_start:user_id_end])
+        # Получаем ID пользователя из текста оригинального сообщения
+        original_message = update.message.reply_to_message.text
+        user_id_start = original_message.find("ID: ") + 4
+        user_id_end = original_message.find(")", user_id_start)
+        user_id = int(original_message[user_id_start:user_id_end])
 
         # Отправляем ответ пользователю
         await context.bot.send_message(chat_id=user_id, text=update.message.text)
     else:
         await update.message.reply_text("Ответьте на сообщение пользователя, чтобы отправить ответ.")
+
+def run_server():
+    """Фиктивный HTTP-сервер для Render."""
+    PORT = int(os.getenv("PORT", 8080))
+    
+    class Handler(http.server.SimpleHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(200)
+            self.send_header("Content-type", "text/plain")
+            self.end_headers()
+            self.wfile.write(b"Bot is running!")
+
+    with socketserver.TCPServer(("", PORT), Handler) as httpd:
+        print(f"Serving at port {PORT}")
+        httpd.serve_forever()
 
 def main():
     # Регистрируем обработчики
@@ -47,6 +64,10 @@ def main():
     # Обработка сообщений от админа
     if ADMIN_ID:
         application.add_handler(MessageHandler(filters.TEXT & filters.Chat(ADMIN_ID), handle_admin_response))
+
+    # Запускаем фиктивный сервер параллельно с ботом
+    import threading
+    threading.Thread(target=run_server, daemon=True).start()
 
     # Запускаем бота с использованием long polling
     application.run_polling()
