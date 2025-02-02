@@ -1,30 +1,13 @@
-from flask import Flask, request
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 import os
 
-# Flask приложение для фиктивного порта и Webhook
-app = Flask(__name__)
-
 # Переменные окружения
-BOT_TOKEN = os.getenv("BOT_TOKEN")  # Используйте переменную окружения для токена
-WEBHOOK_URL = f"https://telegram-feedback-bot-pw8r.onrender.com/webhook"  # Замените на URL вашего сервиса
+BOT_TOKEN = os.getenv("BOT_TOKEN")  # Используем переменную окружения для токена
 ADMIN_ID = 5240690995  # Вставьте свой Telegram ID
 
 # Создаем экземпляр приложения Telegram
 application = ApplicationBuilder().token(BOT_TOKEN).build()
-
-@app.route('/')
-def index():
-    return "Bot is running through Webhook!"
-
-@app.route('/webhook', methods=['POST'])
-def webhook():
-    """Получение обновлений от Telegram через Webhook."""
-    json_update = request.get_json()
-    update = Update.de_json(json_update, application.bot)
-    application.dispatcher.process_update(update)  # Используем правильный метод для обработки обновлений
-    return "OK"
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обрабатывает команду /start."""
@@ -65,11 +48,8 @@ def main():
     if ADMIN_ID:
         application.add_handler(MessageHandler(filters.TEXT & filters.Chat(ADMIN_ID), handle_admin_response))
 
-    # Устанавливаем Webhook для бота
-    application.bot.set_webhook(WEBHOOK_URL)
-
-    # Запуск Flask сервера
-    app.run(host='0.0.0.0', port=int(os.getenv("PORT", 8080)))
+    # Запускаем бота с использованием long polling
+    application.run_polling()
 
 if __name__ == '__main__':
     main()
