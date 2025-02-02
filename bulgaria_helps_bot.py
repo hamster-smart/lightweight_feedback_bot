@@ -3,7 +3,6 @@ from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, fil
 import os
 import http.server
 import socketserver
-import signal
 import threading
 
 # Переменные окружения
@@ -26,31 +25,35 @@ async def forward_to_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Формируем сообщение для администратора
     message_to_admin = f"Сообщение от {user_name} (ID: {user_id}):\n{user_message}"
 
-    # Пересылаем сообщение админу с возможностью ответа
-    sent_message = await context.bot.send_message(chat_id=ADMIN_ID, text=message_to_admin)
-    
-    # Сохраняем ID пользователя в метаданные сообщения
-    context.user_data[sent_message.message_id] = user_id
+    # Пересылаем сообщение админу
+    await context.bot.send_message(chat_id=ADMIN_ID, text=message_to_admin)
 
 async def handle_admin_response(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обрабатывает ответы администратора и пересылает их пользователю."""
     if update.message.reply_to_message:
-        # Получаем ID пользователя из контекста
-        original_message_id = update.message.reply_to_message.message_id
-        user_id = context.user_data.get(original_message_id)
+        # Получаем ID пользователя из оригинального сообщения
+        original_message = update.message.reply_to_message.text
+        user_id_start = original_message.find("ID: ") + 4
+        user_id_end = original_message.find(")", user_id_start)
 
-        if user_id:
-            # Отправляем ответ пользователю
-            await context.bot.send_message(chat_id=user_id, text=update.message.text)
+        if user_id_start != -1 and user_id_end != -1:
+            try:
+                user_id = int(original_message[user_id_start:user_id_end])
+
+                # Отправляем ответ пользователю
+                await context.bot.send_message(chat_id=user_id, text=update.message.text)
+                await update.message.reply_text("Ответ успешно отправлен пользователю.")
+            except ValueError:
+                await update.message.reply_text("Ошибка извлечения ID пользователя.")
         else:
-            await update.message.reply_text("Не удалось найти пользователя для ответа.")
+            await update.message.reply_text("Не найден ID пользователя для ответа.")
     else:
         await update.message.reply_text("Ответьте на сообщение пользователя, чтобы отправить ответ.")
 
 def run_server():
     """Фиктивный HTTP-сервер для Render."""
     PORT = int(os.getenv("PORT", 8080))
-    
+
     class Handler(http.server.SimpleHTTPRequestHandler):
         def do_GET(self):
             self.send_response(200)
@@ -62,17 +65,7 @@ def run_server():
         print(f"Serving at port {PORT}")
         httpd.serve_forever()
 
-def graceful_exit(signum, frame):
-    """Корректно завершает работу сервера и бота."""
-    print("Shutting down bot and server...")
-    application.stop()
-    exit(0)
-
 def main():
-    # Обработка сигналов завершения
-    signal.signal(signal.SIGINT, graceful_exit)
-    signal.signal(signal.SIGTERM, graceful_exit)
-
     # Регистрируем обработчики
     application.add_handler(CommandHandler("start", start))
     application.add_handler(MessageHandler(filters.TEXT & (~filters.FORWARDED) & (~filters.UpdateType.EDITED), forward_to_admin))
