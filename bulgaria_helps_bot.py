@@ -9,6 +9,9 @@ import threading
 BOT_TOKEN = os.getenv("BOT_TOKEN")  # Используем переменную окружения для токена
 ADMIN_ID = 5240690995  # Вставьте свой Telegram ID
 
+# Словарь для хранения связей сообщений и пользователей
+user_message_map = {}
+
 # Создаем экземпляр приложения Telegram
 application = ApplicationBuilder().token(BOT_TOKEN).build()
 
@@ -25,28 +28,23 @@ async def forward_to_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Формируем сообщение для администратора
     message_to_admin = f"Сообщение от {user_name} (ID: {user_id}):\n{user_message}"
 
-    # Пересылаем сообщение админу
-    await context.bot.send_message(chat_id=ADMIN_ID, text=message_to_admin)
+    # Сохраняем связь сообщения и user_id
+    sent_message = await context.bot.send_message(chat_id=ADMIN_ID, text=message_to_admin)
+    user_message_map[sent_message.message_id] = user_id  # Привязываем message_id к user_id
 
 async def handle_admin_response(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обрабатывает ответы администратора и пересылает их пользователю."""
     if update.message.reply_to_message:
-        # Получаем ID пользователя из оригинального сообщения
-        original_message = update.message.reply_to_message.text
-        user_id_start = original_message.find("ID: ") + 4
-        user_id_end = original_message.find(")", user_id_start)
+        # Получаем ID пользователя из словаря
+        admin_reply_id = update.message.reply_to_message.message_id
+        user_id = user_message_map.get(admin_reply_id)
 
-        if user_id_start != -1 and user_id_end != -1:
-            try:
-                user_id = int(original_message[user_id_start:user_id_end])
-
-                # Отправляем ответ пользователю
-                await context.bot.send_message(chat_id=user_id, text=update.message.text)
-                await update.message.reply_text("Ответ успешно отправлен пользователю.")
-            except ValueError:
-                await update.message.reply_text("Ошибка извлечения ID пользователя.")
+        if user_id:
+            # Отправляем ответ пользователю
+            await context.bot.send_message(chat_id=user_id, text=update.message.text)
+            await update.message.reply_text("Ответ успешно отправлен пользователю.")
         else:
-            await update.message.reply_text("Не найден ID пользователя для ответа.")
+            await update.message.reply_text("Не удалось найти пользователя для этого сообщения.")
     else:
         await update.message.reply_text("Ответьте на сообщение пользователя, чтобы отправить ответ.")
 
