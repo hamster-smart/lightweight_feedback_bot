@@ -26,20 +26,24 @@ async def forward_to_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Формируем сообщение для администратора
     message_to_admin = f"Сообщение от {user_name} (ID: {user_id}):\n{user_message}"
 
-    # Пересылаем сообщение админу
-    await context.bot.send_message(chat_id=ADMIN_ID, text=message_to_admin)
+    # Пересылаем сообщение админу с возможностью ответа
+    sent_message = await context.bot.send_message(chat_id=ADMIN_ID, text=message_to_admin)
+    
+    # Сохраняем ID пользователя в метаданные сообщения
+    context.user_data[sent_message.message_id] = user_id
 
 async def handle_admin_response(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обрабатывает ответы администратора и пересылает их пользователю."""
     if update.message.reply_to_message:
-        # Получаем ID пользователя из текста оригинального сообщения
-        original_message = update.message.reply_to_message.text
-        user_id_start = original_message.find("ID: ") + 4
-        user_id_end = original_message.find(")", user_id_start)
-        user_id = int(original_message[user_id_start:user_id_end])
+        # Получаем ID пользователя из контекста
+        original_message_id = update.message.reply_to_message.message_id
+        user_id = context.user_data.get(original_message_id)
 
-        # Отправляем ответ пользователю
-        await context.bot.send_message(chat_id=user_id, text=update.message.text)
+        if user_id:
+            # Отправляем ответ пользователю
+            await context.bot.send_message(chat_id=user_id, text=update.message.text)
+        else:
+            await update.message.reply_text("Не удалось найти пользователя для ответа.")
     else:
         await update.message.reply_text("Ответьте на сообщение пользователя, чтобы отправить ответ.")
 
