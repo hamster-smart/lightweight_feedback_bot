@@ -3,6 +3,8 @@ from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, fil
 import os
 import http.server
 import socketserver
+import signal
+import threading
 
 # Переменные окружения
 BOT_TOKEN = os.getenv("BOT_TOKEN")  # Используем переменную окружения для токена
@@ -56,7 +58,17 @@ def run_server():
         print(f"Serving at port {PORT}")
         httpd.serve_forever()
 
+def graceful_exit(signum, frame):
+    """Корректно завершает работу сервера и бота."""
+    print("Shutting down bot and server...")
+    application.stop()
+    exit(0)
+
 def main():
+    # Обработка сигналов завершения
+    signal.signal(signal.SIGINT, graceful_exit)
+    signal.signal(signal.SIGTERM, graceful_exit)
+
     # Регистрируем обработчики
     application.add_handler(CommandHandler("start", start))
     application.add_handler(MessageHandler(filters.TEXT & (~filters.FORWARDED) & (~filters.UpdateType.EDITED), forward_to_admin))
@@ -66,7 +78,6 @@ def main():
         application.add_handler(MessageHandler(filters.TEXT & filters.Chat(ADMIN_ID), handle_admin_response))
 
     # Запускаем фиктивный сервер параллельно с ботом
-    import threading
     threading.Thread(target=run_server, daemon=True).start()
 
     # Запускаем бота с использованием long polling
