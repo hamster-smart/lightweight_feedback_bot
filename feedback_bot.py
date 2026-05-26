@@ -1,108 +1,96 @@
-from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
+import telebot
+from telebot import types
 import os
-import sqlite3
+from dotenv import load_dotenv
+import security
 
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))
+load_dotenv()
 
-DB_PATH = "message_map.db"
+API_TOKEN = os.getenv("API_TOKEN")
+ADMIN_CHAT_ID = os.getenv("ADMIN_ID")
 
+if not API_TOKEN or not ADMIN_CHAT_ID:
+    print("Ошибка: переменные окружения не загружены. Проверьте .env или environment в docker-compose.")
+    print(f"API_TOKEN: {'OK' if API_TOKEN else 'MISSING'}, ADMIN_ID: {'OK' if ADMIN_CHAT_ID else 'MISSING'}")
+    exit(1)
 
-def init_db():
-    """Создаёт таблицу для хранения связей сообщений и пользователей."""
-    with sqlite3.connect(DB_PATH) as conn:
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS message_map (
-                admin_message_id INTEGER PRIMARY KEY,
-                user_id          INTEGER NOT NULL
-            )
-        """)
+bot = telebot.TeleBot(API_TOKEN)
 
 
-def save_mapping(admin_message_id: int, user_id: int):
-    with sqlite3.connect(DB_PATH) as conn:
-        conn.execute(
-            "INSERT OR REPLACE INTO message_map VALUES (?, ?)",
-            (admin_message_id, user_id)
-        )
-
-
-def get_user_id(admin_message_id: int) -> int | None:
-    with sqlite3.connect(DB_PATH) as conn:
-        row = conn.execute(
-            "SELECT user_id FROM message_map WHERE admin_message_id = ?",
-            (admin_message_id,)
-        ).fetchone()
-    return row[0] if row else None
-
-
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обрабатывает команду /start."""
-    await update.message.reply_text(
-        "Приветствую! Напишите Ваше сообщение (заявку), и я передам администратору."
+@bot.message_handler(commands=["start"])
+def handle_start_command(message):
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    markup.add(types.KeyboardButton("Связаться с администратором"))
+    bot.send_message(
+        message.chat.id,
+        "Приветствую! Напишите Ваше сообщение (заявку), и я передам администратору.",
+        reply_markup=markup,
     )
 
 
-async def forward_to_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Пересылает сообщение пользователя админу."""
-    user_id = update.message.from_user.id
-    user_name = update.message.from_user.full_name
-    user_message = update.message.text
+@bot.message_handler(func=lambda message: True)
+def handle_user_message(message):
+    # Сообщения от самого админа не пересылаем
+    if str(message.chat.id) == str(ADMIN_CHAT_ID):
+        return
 
-    message_to_admin = f"Сообщение от {user_name} (ID: {user_id}):\n{user_message}"
-    sent = await context.bot.send_message(chat_id=ADMIN_ID, text=message_to_admin)
-    save_mapping(sent.message_id, user_id)
-
-
-async def handle_admin_response(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обрабатывает ответы администратора и пересылает их пользователю."""
-    if not update.message.reply_to_message:
-        await update.message.reply_text(
-            "Ответьте на сообщение пользователя, чтобы отправить ответ."
+    if not security.is_user_request_allowed(message.chat.id):
+        bot.send_message(
+            message.chat.id,
+            "Вы отправляете сообщения слишком часто. Подождите немного.",
         )
         return
 
-    admin_reply_id = update.message.reply_to_message.message_id
-    user_id = get_user_id(admin_reply_id)
-
-    if user_id:
-        await context.bot.send_message(chat_id=user_id, text=update.message.text)
-        await update.message.reply_text("Ответ успешно отправлен пользователю.")
-    else:
-        await update.message.reply_text(
-            "Не удалось найти пользователя для этого сообщения."
+    if not security.is_valid_message(message.text):
+        bot.send_message(
+            message.chat.id,
+            "Ваше сообщение содержит недопустимые ссылки. Попробуйте без них.",
         )
+        return
+
+    if message.text.startswith("/"):
+        bot.send_message(message.chat.id, "Неизвестная команда. Попробуйте снова.")
+        return
+
+    if message.text == "Связаться с администратором":
+        bot.send_message(message.chat.id, "Пожалуйста, опишите вашу проблему:")
+        return
+
+    user_id = message.chat.id
+    full_name = f"{message.from_user.first_name or ''} {message.from_user.last_name or ''}".strip()
+
+    markup = types.InlineKeyboardMarkup()
+    markup.add(
+        types.InlineKeyboardButton(
+            "Ответить",
+            callback_data=f"reply:{user_id}:{message.message_id}",
+        )
+    )
+
+    bot.send_message(
+        ADMIN_CHAT_ID,
+        f"Сообщение от {full_name} (ID: {user_id}):\n{message.text}",
+        reply_markup=markup,
+    )
 
 
-def main():
-    if not BOT_TOKEN:
-        raise RuntimeError("BOT_TOKEN не задан")
-    if not ADMIN_ID:
-        raise RuntimeError("ADMIN_ID не задан")
-
-    init_db()
-
-    application = ApplicationBuilder().token(BOT_TOKEN).build()
-
-    # Сообщения от обычных пользователей (не от админа)
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(MessageHandler(
-        filters.TEXT
-        & ~filters.Chat(ADMIN_ID)
-        & ~filters.FORWARDED
-        & ~filters.UpdateType.EDITED,
-        forward_to_admin
-    ))
-
-    # Ответы от админа
-    application.add_handler(MessageHandler(
-        filters.TEXT & filters.Chat(ADMIN_ID),
-        handle_admin_response
-    ))
-
-    application.run_polling()
+@bot.callback_query_handler(func=lambda call: call.data.startswith("reply:"))
+def handle_reply_button(call):
+    try:
+        _, user_id, _ = call.data.split(":")
+        bot.answer_callback_query(call.id)
+        sent = bot.send_message(ADMIN_CHAT_ID, f"Введите ответ для пользователя {user_id}:")
+        bot.register_next_step_handler(sent, send_reply, user_id)
+    except Exception as e:
+        bot.send_message(ADMIN_CHAT_ID, f"Ошибка при обработке кнопки: {e}")
 
 
-if __name__ == "__main__":
-    main()
+def send_reply(message, user_id):
+    try:
+        bot.send_message(user_id, message.text)
+        bot.send_message(ADMIN_CHAT_ID, f"Ответ отправлен пользователю {user_id}.")
+    except Exception as e:
+        bot.send_message(ADMIN_CHAT_ID, f"Не удалось отправить ответ: {e}")
+
+
+bot.infinity_polling()
