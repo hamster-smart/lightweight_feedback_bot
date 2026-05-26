@@ -1,1 +1,1 @@
-# worker: python bulgaria_helps_bot.py
+# worker: python lightweight_feedback_bot.py
