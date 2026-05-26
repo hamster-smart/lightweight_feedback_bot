@@ -1,0 +1,14 @@
+services:
+  telegram_feedback_bot:
+    build: .
+    env_file: .env
+    environment:
+      - API_TOKEN=${API_TOKEN}
+      - ADMIN_ID=${ADMIN_ID}
+    networks:
+      - telegram_bot_network
+    restart: unless-stopped
+
+networks:
+  telegram_bot_network:
+    external: false
