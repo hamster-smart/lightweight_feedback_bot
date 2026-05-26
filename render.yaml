@@ -4,7 +4,7 @@ services:
     env: python
     plan: free
     buildCommand: "pip install -r requirements.txt"
-    startCommand: "python bulgaria_helps_bot.py"
+    startCommand: "python feedback_bot.py"
     envVars:
       - key: BOT_TOKEN
         sync: false
