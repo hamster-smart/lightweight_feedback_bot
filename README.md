@@ -1,15 +1,17 @@
 # lightweight_feedback_bot
 
-A minimal Telegram feedback bot. Users send messages — the admin receives them and replies directly in Telegram. No external services, no database server required.
+A minimal Telegram feedback bot. Users send messages — the admin receives them with a reply button and can respond directly from Telegram. No external services required.
 
 ---
 
 ## How it works
 
-1. User sends any text message to the bot
-2. Bot forwards it to the admin with the user's name and ID
-3. Admin replies to that forwarded message
+1. User sends a message to the bot
+2. Bot forwards it to the admin with an inline **Reply** button
+3. Admin clicks Reply, types a response
 4. Bot delivers the reply back to the original user
+
+Rate limiting and link filtering are handled by `security.py`.
 
 ---
 
@@ -19,41 +21,46 @@ A minimal Telegram feedback bot. Users send messages — the admin receives them
 
 | Variable | Description |
 |---|---|
-| `BOT_TOKEN` | Bot token from [@BotFather](https://t.me/BotFather) |
+| `API_TOKEN` | Bot token from [@BotFather](https://t.me/BotFather) |
 | `ADMIN_ID` | Your Telegram user ID (get it from [@userinfobot](https://t.me/userinfobot)) |
 
-Copy `.env.example` to `.env` for local development:
+Copy `.env.example` to `.env` and fill in the values:
 
 ```bash
 cp .env.example .env
 ```
 
-### Run locally
+### Run with Docker Compose
+
+```bash
+docker compose up -d --build
+```
+
+### Run locally (without Docker)
 
 ```bash
 pip install -r requirements.txt
-BOT_TOKEN=... ADMIN_ID=... python bulgaria_helps_bot.py
+python bulgaria_helps_bot.py
 ```
-
-### Deploy to Render
-
-1. Fork or push this repo to GitHub
-2. Create a new **Background Worker** on [render.com](https://render.com)
-3. Set `BOT_TOKEN` and `ADMIN_ID` in the Environment tab
-4. Deploy — the `render.yaml` config handles the rest
 
 ---
 
 ## Stack
 
-- Python 3.11+
-- [python-telegram-bot](https://github.com/python-telegram-bot/python-telegram-bot) 20.x
-- SQLite (persistent message mapping, survives restarts)
-- Render free tier (Background Worker)
+- Python 3.11
+- [pyTelegramBotAPI](https://github.com/eternnoir/pyTelegramBotAPI) (telebot)
+- python-dotenv
+- Docker / Docker Compose
 
 ---
 
-## Notes
+## Files
 
-- Message-to-user mapping is stored in a local SQLite file (`message_map.db`), so admin replies work correctly after bot restarts
-- On Render free tier, worker services don't spin down like web services do — no dummy HTTP server needed
+| File | Purpose |
+|---|---|
+| `bulgaria_helps_bot.py` | Main bot logic |
+| `security.py` | Rate limiting, link filtering, error handling |
+| `Dockerfile` | Container build |
+| `docker-compose.yml` | Compose deployment |
+| `.env.example` | Environment variable template |
+| `.dockerignore` | Excludes `.env` and cache from image |
