@@ -58,7 +58,7 @@ python bulgaria_helps_bot.py
 
 | File | Purpose |
 |---|---|
-| `bulgaria_helps_bot.py` | Main bot logic |
+| `feedback_bot.py` | Main bot logic |
 | `security.py` | Rate limiting, link filtering, error handling |
 | `Dockerfile` | Container build |
 | `docker-compose.yml` | Compose deployment |
